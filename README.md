@@ -249,6 +249,28 @@ queue.on(event, handler)            // returns an unsubscribe function
 `enqueued` · `started` · `succeeded` · `failed` · `discarded` · `drained` ·
 `changed`
 
+## Using it for chat
+
+Sending messages is one of the best fits for this library — the WhatsApp
+clock-icon behaviour. But chat needs different settings, and one default is
+actively dangerous:
+
+⚠️ **Never use `dedupeKey` for messages.** Dedupe collapses tasks sharing a
+key, which for chat means **deleted messages** — send three, two vanish.
+
+```ts
+queue.enqueue('sendMessage', msg);   // ✅ no dedupeKey
+```
+
+Also raise `maxAttempts` (users expect messages to keep trying for hours),
+keep `concurrency: 1` for ordering, and send a device-generated message id as
+an idempotency key so retries do not post twice.
+
+This only covers **sending**. Receiving still needs a WebSocket or push
+notifications.
+
+📖 [Full chat recipe](docs/GUIDE.md#recipe-using-it-for-chat)
+
 ## Behaviour worth knowing
 
 **Ordering.** With the default `concurrency: 1`, tasks execute strictly in

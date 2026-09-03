@@ -12,6 +12,7 @@ you can follow it without having built an offline-first app before.
 - [Integration walkthrough](#integration-walkthrough)
 - [Making your API safe to retry](#making-your-api-safe-to-retry)
 - [Testing offline behaviour](#testing-offline-behaviour)
+- [Recipe: using it for chat](#recipe-using-it-for-chat)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
 
@@ -434,6 +435,138 @@ the behaviour reproducible in tests.
 5. Make the server return 422 → discarded immediately, no retries
 
 ---
+
+## Recipe: using it for chat
+
+Sending chat messages is one of the best fits for this library — it is exactly
+the WhatsApp clock-icon behaviour. But chat needs different settings from
+form saving, and one of the defaults is actively dangerous here.
+
+### It only covers half of messaging
+
+| | Use this library? |
+|---|---|
+| **Sending** messages | ✅ Yes — this is the ideal case |
+| **Receiving** messages | ❌ No — you need a WebSocket or push notifications |
+
+This queue only pushes outward. Keep your existing real-time layer for the
+inbound side.
+
+### ⚠️ Never use `dedupeKey` for messages
+
+Deduplication collapses tasks sharing a key. For a draft that is what you
+want. For chat it **deletes messages** — send three, two disappear.
+
+```ts
+// ❌ Catastrophic: only the last message survives
+queue.enqueue('sendMessage', msg, { dedupeKey: `chat:${chatId}` });
+
+// ✅ Every message is distinct
+queue.enqueue('sendMessage', msg);
+```
+
+If you need dedupe elsewhere in the same app, use a **separate queue instance**
+for messages rather than sharing one.
+
+### Settings that differ from the defaults
+
+```ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createQueue } from 'react-native-outbox-mutation-queue';
+
+type OutgoingMessage = {
+  localId: string;   // generated on the device, before sending
+  chatId: string;
+  body: string;
+  sentAt: number;
+};
+
+export const messageQueue = createQueue<OutgoingMessage>({
+  storage: AsyncStorage,
+  storageKey: 'chat-outbox/v1',   // keep separate from other queues
+
+  // Messages must arrive in the order they were typed.
+  concurrency: 1,
+
+  // Users expect a message to keep trying for hours, not seconds.
+  retry: {
+    maxAttempts: 50,
+    baseDelayMs: 1000,
+    maxDelayMs: 300_000,          // back off to at most 5 minutes
+    jitter: 0.3,
+  },
+
+  async execute(task) {
+    const res = await fetch('https://api.example.com/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Critical: stops a retry posting the message twice.
+        'Idempotency-Key': task.payload.localId,
+      },
+      body: JSON.stringify(task.payload),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  },
+
+  classifyError(error) {
+    const status = Number(String(error).match(/HTTP (\d+)/)?.[1]);
+    // 413 too large, 403 blocked — retrying will not help.
+    return status >= 400 && status < 500 ? 'permanent' : 'transient';
+  },
+
+  onDiscard(task) {
+    // Show "failed — tap to retry" on the bubble.
+    // Never let a message silently vanish.
+    markMessageFailed(task.payload.localId);
+  },
+});
+```
+
+**Why `maxAttempts: 50`.** The default of 5 gives up after roughly 30 seconds.
+With the values above, a message keeps retrying for hours — which is what a
+user on a long train journey expects.
+
+**Why `localId` as the idempotency key.** Duplicate messages in a chat are
+extremely visible. Generate the id on the device when the user hits send, use
+it both as the React key for the bubble and as the idempotency key, and the
+server can discard repeats.
+
+### Rendering message status
+
+```tsx
+import { useOfflineQueue } from 'react-native-outbox-mutation-queue/react';
+
+function MessageBubble({ message }) {
+  const { tasks } = useOfflineQueue(messageQueue);
+  const queued = tasks.find((t) => t.payload.localId === message.localId);
+
+  return (
+    <View>
+      <Text>{message.body}</Text>
+      {queued ? (
+        <Text>{queued.attempts > 0 ? 'Sending…' : 'Pending'}</Text>
+      ) : (
+        <Text>Sent ✓</Text>
+      )}
+    </View>
+  );
+}
+```
+
+Write the message into your local store **immediately** on send, so it appears
+in the conversation right away. The queue handles delivery; your UI reflects
+its state.
+
+### Checklist
+
+- [ ] No `dedupeKey` on messages
+- [ ] `concurrency: 1` for ordering
+- [ ] High `maxAttempts` with a capped `maxDelayMs`
+- [ ] Device-generated `localId` sent as the idempotency key
+- [ ] `onDiscard` marks the bubble failed and offers retry
+- [ ] Separate queue instance and `storageKey` from other mutations
+- [ ] A WebSocket or push notifications still handles *receiving*
 
 ## Troubleshooting
 
