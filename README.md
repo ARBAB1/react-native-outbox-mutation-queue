@@ -332,13 +332,8 @@ before opening a PR.
 
 ## Support this project
 
-If this saved you an afternoon, you can say thanks:
-
-<a href="https://www.buymeacoffee.com/arbab1" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="46" width="163">
-</a>
-
-Starring the repo helps too — it is how other developers find it.
+Starring the repo helps — it is how other developers find it. Bug reports and
+pull requests are just as welcome.
 
 ## License
 
