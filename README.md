@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/react-native-outbox-mutation-queue.svg)](https://www.npmjs.com/package/react-native-outbox-mutation-queue)
 [![CI](https://github.com/ARBAB1/react-native-outbox-mutation-queue/actions/workflows/ci.yml/badge.svg)](https://github.com/ARBAB1/react-native-outbox-mutation-queue/actions/workflows/ci.yml)
-[![license](https://img.shields.io/npm/l/react-native-outbox-mutation-queue.svg)](./LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![types](https://img.shields.io/npm/types/react-native-outbox-mutation-queue.svg)](./src/types.ts)
 [![zero deps](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](./package.json)
 
