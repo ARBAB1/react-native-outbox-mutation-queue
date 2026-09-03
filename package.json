@@ -1,0 +1,66 @@
+{
+  "name": "react-native-outbox-mutation-queue",
+  "version": "0.1.0",
+  "description": "A focused offline mutation queue for React Native \u2014 queue API writes while offline, retry with exponential backoff, deduplicate, persist across restarts.",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./react": {
+      "types": "./lib/react.d.ts",
+      "default": "./lib/react.js"
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build",
+    "demo": "node example/node-demo.cjs"
+  },
+  "keywords": [
+    "react-native",
+    "offline",
+    "offline-first",
+    "queue",
+    "mutation",
+    "retry",
+    "backoff",
+    "sync",
+    "async-storage"
+  ],
+  "license": "MIT",
+  "sideEffects": false,
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ARBAB1/react-native-outbox-mutation-queue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ARBAB1/react-native-outbox-mutation-queue/issues"
+  },
+  "homepage": "https://github.com/ARBAB1/react-native-outbox-mutation-queue#readme",
+  "author": "Syed Arbab Ali Shah <syedarbabalishah@gmail.com>"
+}
