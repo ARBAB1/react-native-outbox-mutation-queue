@@ -19,21 +19,51 @@ you can follow it without having built an offline-first app before.
 
 ## The problem in plain terms
 
-Someone opens your app on the metro, edits their profile, taps **Save**, and
-the screen goes into a tunnel.
+Imagine your app has a "Save" button.
 
-What normally happens:
+Normally when someone taps Save, your app sends the data to the server right
+then:
 
-1. `fetch()` throws
-2. You show "Something went wrong, try again"
-3. The user has already locked their phone and walked away
-4. **The edit is gone**
+```
+User taps Save → app sends to server → server replies "ok" → done
+```
 
-What should happen: the app accepts the edit, remembers it, and sends it the
-moment there is signal again — even if the user force-quit the app in between.
+But what if there is no internet at that moment? In a lift, on the metro, in a
+basement, bad signal.
 
-That is all this library does. You hand it a mutation; it takes responsibility
-for getting it delivered.
+The send fails. Your app shows "Error, try again." The user has already put
+their phone in their pocket. **Their data is gone.**
+
+### What this library does
+
+It sits in between:
+
+```
+User taps Save → library stores it on the phone → shows "Saved" instantly
+                          ↓
+                 (waits until internet comes back)
+                          ↓
+                 sends to server automatically
+```
+
+The user never sees an error. They do not have to retry. It just gets
+delivered whenever the connection returns — even if they close the app
+completely and open it tomorrow.
+
+That is it. That is the whole idea.
+
+### What it handles for you
+
+| Situation | What happens |
+|---|---|
+| **No internet** | Holds the data safely on the phone |
+| **Internet comes back** | Sends it automatically |
+| **Server is down** | Waits and tries again — 1s, then 2s, 4s, 8s. Not hammering it |
+| **Server says "invalid"** | Stops trying, tells your app |
+| **User saved 10 times quickly** | Sends only the last version, not all 10 |
+| **User force-closed the app** | Still there when they reopen |
+
+You hand it a mutation; it takes responsibility for getting it delivered.
 
 ### When you need this
 
