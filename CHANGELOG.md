@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `deduped(kept, dropped, strategy)` event so collapsing a task is observable
+  rather than silent
+- One-time development warning the first time deduplication discards a
+  payload, with `silenceDedupeWarning` to opt out
+- Chat recipe in the guide, including why `dedupeKey` must not be used for
+  messages
+
 ## [0.1.0] - 2026-09-03
 
 Initial release.

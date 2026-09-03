@@ -192,6 +192,92 @@ describe('OfflineQueue', () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  it('emits deduped naming the task that was discarded', async () => {
+    const queue = createQueue<{ n: number }>({
+      execute: async () => {},
+      autoStart: false,
+      silenceDedupeWarning: true,
+    });
+    await queue.ready();
+
+    const onDeduped = vi.fn();
+    queue.on('deduped', onDeduped);
+
+    await queue.enqueue('save', { n: 1 }, { dedupeKey: 'k' });
+    await queue.enqueue('save', { n: 2 }, { dedupeKey: 'k' });
+
+    expect(onDeduped).toHaveBeenCalledTimes(1);
+    const [kept, dropped, strategy] = onDeduped.mock.calls[0];
+    expect(kept.payload).toEqual({ n: 2 });
+    expect(dropped.payload).toEqual({ n: 1 });
+    expect(strategy).toBe('replace');
+  });
+
+  it('emits deduped under the drop strategy too', async () => {
+    const queue = createQueue<{ n: number }>({
+      execute: async () => {},
+      dedupeStrategy: 'drop',
+      autoStart: false,
+      silenceDedupeWarning: true,
+    });
+    await queue.ready();
+
+    const onDeduped = vi.fn();
+    queue.on('deduped', onDeduped);
+
+    await queue.enqueue('save', { n: 1 }, { dedupeKey: 'k' });
+    await queue.enqueue('save', { n: 2 }, { dedupeKey: 'k' });
+
+    const [kept, dropped] = onDeduped.mock.calls[0];
+    expect(kept.payload).toEqual({ n: 1 });
+    expect(dropped.payload).toEqual({ n: 2 });
+  });
+
+  it('warns once when a task is collapsed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const queue = createQueue({ execute: async () => {}, autoStart: false });
+    await queue.ready();
+
+    await queue.enqueue('save', { n: 1 }, { dedupeKey: 'k' });
+    await queue.enqueue('save', { n: 2 }, { dedupeKey: 'k' });
+    await queue.enqueue('save', { n: 3 }, { dedupeKey: 'k' });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('dedupeKey');
+    warn.mockRestore();
+  });
+
+  it('stays silent when silenceDedupeWarning is set', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const queue = createQueue({
+      execute: async () => {},
+      autoStart: false,
+      silenceDedupeWarning: true,
+    });
+    await queue.ready();
+
+    await queue.enqueue('save', { n: 1 }, { dedupeKey: 'k' });
+    await queue.enqueue('save', { n: 2 }, { dedupeKey: 'k' });
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('never collapses tasks that carry no dedupeKey', async () => {
+    const queue = createQueue<{ n: number }>({
+      execute: async () => {},
+      autoStart: false,
+    });
+    await queue.ready();
+
+    await queue.enqueue('sendMessage', { n: 1 });
+    await queue.enqueue('sendMessage', { n: 2 });
+    await queue.enqueue('sendMessage', { n: 3 });
+
+    // The chat case: every message must survive.
+    expect(queue.size()).toBe(3);
+  });
+
   it('emits changed when the queue mutates', async () => {
     const queue = createQueue({ execute: async () => {}, autoStart: false });
     await queue.ready();

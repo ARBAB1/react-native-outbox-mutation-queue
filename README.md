@@ -197,6 +197,16 @@ await queue.enqueue('saveDraft', { text: 'abc' }, { dedupeKey: 'draft:42' });
 Only **pending** tasks collapse. A task already in flight is never replaced —
 that would leave its side effect half-applied.
 
+⚠️ **Deduplication throws work away.** That is the point for drafts, and a
+data-loss bug for anything that must each be delivered — chat messages above
+all. Two safeguards:
+
+- The queue emits **`deduped(kept, dropped, strategy)`** so you can observe it
+- It logs a **one-time warning** the first time a collapse happens; pass
+  `silenceDedupeWarning: true` once you have confirmed it is intended
+
+Tasks without a `dedupeKey` are never collapsed.
+
 ## Retries
 
 Exponential backoff with jitter, so a fleet of devices reconnecting together
@@ -229,6 +239,7 @@ within ±`jitter`. Default schedule: **1s → 2s → 4s → 8s → 16s**.
 | `classifyError` | `transient` | Return `permanent` to stop retrying |
 | `onDiscard` | — | Conflict hook: retries exhausted or permanent |
 | `autoStart` | `true` | Begin processing immediately |
+| `silenceDedupeWarning` | `false` | Suppress the one-time dedupe warning |
 
 ### Methods
 
@@ -246,8 +257,12 @@ queue.on(event, handler)            // returns an unsubscribe function
 
 ### Events
 
-`enqueued` · `started` · `succeeded` · `failed` · `discarded` · `drained` ·
-`changed`
+`enqueued` · `deduped` · `started` · `succeeded` · `failed` · `discarded` ·
+`drained` · `changed`
+
+`deduped(kept, dropped, strategy)` fires whenever a task is collapsed, naming
+the payload that was discarded — so the discard is observable rather than
+silent.
 
 ## Using it for chat
 

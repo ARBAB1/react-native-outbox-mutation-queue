@@ -54,6 +54,13 @@ export interface QueueConfig<P = unknown> {
 
   /** Start processing as soon as the queue is constructed. Default true. */
   autoStart?: boolean;
+
+  /**
+   * Suppress the one-time development warning emitted the first time a task
+   * is collapsed by `dedupeKey`. Set this once you have confirmed the
+   * collapsing is intended.
+   */
+  silenceDedupeWarning?: boolean;
 }
 
 type Listeners = {
@@ -69,6 +76,9 @@ export class OfflineQueue<P = unknown> {
   private readonly concurrency: number;
   private readonly config: QueueConfig<P>;
 
+  private readonly silenceDedupeWarning: boolean;
+  private warnedAboutDedupe = false;
+
   private online = true;
   private running = false;
   private draining = false;
@@ -78,6 +88,7 @@ export class OfflineQueue<P = unknown> {
 
   private listeners: Listeners = {
     enqueued: new Set(),
+    deduped: new Set(),
     started: new Set(),
     succeeded: new Set(),
     failed: new Set(),
@@ -93,6 +104,7 @@ export class OfflineQueue<P = unknown> {
     this.retry = { ...DEFAULT_RETRY, ...config.retry };
     this.dedupeStrategy = config.dedupeStrategy ?? 'replace';
     this.concurrency = Math.max(1, config.concurrency ?? 1);
+    this.silenceDedupeWarning = config.silenceDedupeWarning ?? false;
     this.running = config.autoStart ?? true;
 
     this.hydrated = this.hydrate();
@@ -164,11 +176,15 @@ export class OfflineQueue<P = unknown> {
       );
 
       if (existingIndex !== -1) {
-        if (strategy === 'drop') {
-          return this.tasks[existingIndex];
-        }
-        // 'replace' — keep queue position, take the newer payload.
         const existing = this.tasks[existingIndex];
+
+        if (strategy === 'drop') {
+          this.noteDedupe();
+          this.emit('deduped', existing, task, strategy);
+          return existing;
+        }
+
+        // 'replace' — keep queue position, take the newer payload.
         const merged: Task<P> = {
           ...existing,
           payload: task.payload,
@@ -177,6 +193,9 @@ export class OfflineQueue<P = unknown> {
         };
         this.tasks[existingIndex] = merged;
         await this.persist();
+        this.noteDedupe();
+        // `existing` carried the payload that is now gone.
+        this.emit('deduped', merged, existing, strategy);
         this.emit('enqueued', merged);
         void this.drain();
         return merged;
@@ -226,6 +245,28 @@ export class OfflineQueue<P = unknown> {
   }
 
   // ------------------------------------------------------------------ internal
+
+  /**
+   * Deduplication discards work by design, but a silent discard is how the
+   * "my chat messages disappeared" bug happens. Warn once per queue in dev so
+   * the behaviour is discovered during development rather than in production.
+   */
+  private noteDedupe(): void {
+    if (this.warnedAboutDedupe || this.silenceDedupeWarning) return;
+    this.warnedAboutDedupe = true;
+
+    const dev = (globalThis as { __DEV__?: boolean }).__DEV__;
+    if (dev === false) return;
+
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[outbox] A queued task was collapsed because it shared a dedupeKey ' +
+        'with another. This is intentional for drafts and form saves, but it ' +
+        'DISCARDS the other payload — do not use dedupeKey for items that ' +
+        'must each be delivered, such as chat messages. Listen to the ' +
+        '"deduped" event to observe this, or pass silenceDedupeWarning: true.',
+    );
+  }
 
   private async hydrate(): Promise<void> {
     try {

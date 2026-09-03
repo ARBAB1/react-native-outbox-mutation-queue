@@ -53,6 +53,15 @@ export type FailureKind = 'transient' | 'permanent';
 
 export interface QueueEvents<P = unknown> {
   enqueued: (task: Task<P>) => void;
+  /**
+   * A task was collapsed into another because they shared a `dedupeKey`.
+   * `kept` remains queued; `dropped` was discarded.
+   *
+   * Deduplication is intentional, but it does throw work away. Listen here to
+   * log or reconcile — and to catch the classic mistake of giving a dedupeKey
+   * to things that must each be delivered, such as chat messages.
+   */
+  deduped: (kept: Task<P>, dropped: Task<P>, strategy: DedupeStrategy) => void;
   started: (task: Task<P>) => void;
   succeeded: (task: Task<P>) => void;
   failed: (task: Task<P>, error: unknown, willRetry: boolean) => void;
