@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Chat recipe in the guide, including why `dedupeKey` must not be used for
   messages
 
+### Fixed
+- Strict submission order was not preserved at `concurrency: 1` when a task
+  failed transiently: the backing-off head task was skipped and a later task
+  delivered ahead of it. The queue now waits for the head task, restoring strict
+  FIFO order under failure. This is deliberate head-of-line blocking — a
+  persistently failing task delays those behind it until it is discarded at the
+  retry limit; raise `concurrency` to favour throughput over ordering (added a
+  regression test).
+
 ## [0.1.0] - 2026-09-03
 
 Initial release.

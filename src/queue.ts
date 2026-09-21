@@ -297,6 +297,18 @@ export class OfflineQueue<P = unknown> {
   }
 
   private nextRunnable(now: number): Task<P> | undefined {
+    // With concurrency 1 the queue promises strict submission order. A task
+    // that failed transiently is still the head of the queue while it backs
+    // off, so we must WAIT for it rather than deliver a later task ahead of it.
+    // (scheduleNext wakes the queue when the head becomes eligible.) Running a
+    // later task here is what previously broke ordering under transient failure.
+    if (this.concurrency === 1) {
+      const head = this.tasks[0];
+      if (!head || head.status !== 'pending') return undefined;
+      if (head.nextAttemptAt && head.nextAttemptAt > now) return undefined;
+      return head;
+    }
+
     return this.tasks.find(
       (t) =>
         t.status === 'pending' && (!t.nextAttemptAt || t.nextAttemptAt <= now),
