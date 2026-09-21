@@ -1,7 +1,7 @@
 {
   "name": "react-native-outbox-mutation-queue",
-  "version": "0.1.0",
-  "description": "A focused offline mutation queue for React Native \u2014 queue API writes while offline, retry with exponential backoff, deduplicate, persist across restarts.",
+  "version": "0.1.1",
+  "description": "A focused offline mutation queue for React Native — queue API writes while offline, retry with exponential backoff, deduplicate, persist across restarts.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
